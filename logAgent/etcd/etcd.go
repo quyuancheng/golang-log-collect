@@ -66,3 +66,24 @@ func PutConf(key string, val string) {
 	}
 	fmt.Println("put to etcd success")
 }
+
+// 哨兵监视
+
+func WatchConf(key string, newConCh chan<- []*LogEntry) {
+	ch := cli.Watch(context.Background(), key)
+	// 从通道尝试取值
+	for wresp := range ch {
+		for _, evt := range wresp.Events {
+			fmt.Printf("Type:%v key:%v value:%v", evt.Type, string(evt.Kv.Key), string(evt.Kv.Value))
+			// 通知taillog.tskMgr
+			var newConf []*LogEntry
+			err := json.Unmarshal(evt.Kv.Value, &newConf)
+			if err != nil {
+				fmt.Println("Unmarshal failed:", err)
+				continue
+			}
+			fmt.Println("get new conf:", newConf)
+			newConCh <- newConf
+		}
+	}
+}

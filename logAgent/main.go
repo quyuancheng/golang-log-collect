@@ -7,11 +7,13 @@ import (
 	"11111/Log-collection/logAgent/taillog"
 	"fmt"
 	"gopkg.in/ini.v1"
+	"sync"
 	"time"
 )
 
 var (
 	cfg = new(config.AppConf)
+	wg  sync.WaitGroup
 )
 
 func main() {
@@ -33,7 +35,8 @@ func main() {
 		fmt.Println("init etcd failed :", err)
 	}
 	// put key value to etcd test
-	value := `[{"path":"F:\\GOProject\\src\\11111\\Log-collection\\logAgent\\game.log","topic":"game_log"}]`
+	value := `[{"path":"F:\\GOProject\\src\\11111\\Log-collection\\logAgent\\game.log","topic":"game_log"},
+               {"path":"F:\\GOProject\\src\\11111\\Log-collection\\logAgent\\my.log","topic":"test_log"}]`
 	etcd.PutConf("qyc", value)
 	// 1、-----从etcd获取日志收集项的配置信息-----
 	logConfEntries, err := etcd.GetConf("qyc")
@@ -42,11 +45,16 @@ func main() {
 		return
 	}
 	fmt.Println("get logConf from etcd success :", logConfEntries)
-	// 遍历logConfEntries，实例化每一个tailTask
+
+	// 遍历logConfEntries，实例化每一个tailTask,发送给Kafka
 	taillog.Init(logConfEntries)
 
 	// 2、-----派一个哨兵去监视日志收集项的变化（有变化即时通知我的logAgent实现热加载配置）-----
-	time.Sleep(time.Second * 100)
+	newConChan := taillog.NewConfChan() // 从taillong中获取通道
+
+	wg.Add(1)
+	go etcd.WatchConf(cfg.EtcdConf.Key, newConChan) //哨兵发现最新的配置会通知上面的那个通道
+	wg.Wait()
 	// 运行
 	//run()
 
