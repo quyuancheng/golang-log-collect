@@ -5,6 +5,7 @@ import (
 	"11111/Log-collection/logAgent/etcd"
 	"11111/Log-collection/logAgent/kafka"
 	"11111/Log-collection/logAgent/taillog"
+	"11111/Log-collection/logAgent/utils"
 	"fmt"
 	"gopkg.in/ini.v1"
 	"sync"
@@ -34,12 +35,16 @@ func main() {
 	if err != nil {
 		fmt.Println("init etcd failed :", err)
 	}
-	// put key value to etcd test
-	value := `[{"path":"F:\\GOProject\\src\\11111\\Log-collection\\logAgent\\game.log","topic":"game_log"},
-               {"path":"F:\\GOProject\\src\\11111\\Log-collection\\logAgent\\my.log","topic":"test_log"}]`
-	etcd.PutConf("qyc", value)
+
+	// 为了使每个logAgent都能拉去自己独有的配置，所以要以自己ip作为区分
+	ip, err := utils.GetOutboundIP()
+	if err != nil {
+		fmt.Println("get ip failed:", err)
+	}
+	etcdConfKey := fmt.Sprintf(cfg.EtcdConf.Key, ip)
+	fmt.Println("etcdConfKey:", etcdConfKey)
 	// 1、-----从etcd获取日志收集项的配置信息-----
-	logConfEntries, err := etcd.GetConf("qyc")
+	logConfEntries, err := etcd.GetConf(etcdConfKey)
 	if err != nil {
 		fmt.Println("etcd GetConf failed :", err)
 		return
